@@ -3632,6 +3632,42 @@ static Image LoadImageFromCgltfImage(cgltf_image *image, const char *texPath, Co
     return rimage;
 }
 
+// Find the node associated to a given mesh
+static cgltf_node * FindNode(cgltf_data * data, cgltf_mesh * mesh)
+{
+  for(cgltf_size i = 0; i < data->nodes_count; ++i)
+  {
+    if(data->nodes[i].mesh == mesh)
+    {
+      return &data->nodes[i];
+    }
+  }
+  return NULL;
+}
+
+// Convert a GLTF matrix to raylib representation
+static Matrix MatrixFromGLTF(float * m)
+{
+  Matrix transform;
+  transform.m0 = m[0];
+  transform.m1 = m[1];
+  transform.m2 = m[2];
+  transform.m3 = m[3];
+  transform.m4 = m[4];
+  transform.m5 = m[5];
+  transform.m6 = m[6];
+  transform.m7 = m[7];
+  transform.m8 = m[8];
+  transform.m9 = m[9];
+  transform.m10 = m[10];
+  transform.m11 = m[11];
+  transform.m12 = m[12];
+  transform.m13 = m[13];
+  transform.m14 = m[14];
+  transform.m15 = m[15];
+  return transform;
+}
+
 // LoadGLTF loads in model data from given filename, supporting both .gltf and .glb
 static Model LoadGLTF(const char *fileName)
 {
@@ -3772,6 +3808,7 @@ static Model LoadGLTF(const char *fileName)
 
         for (unsigned int i = 0; i < data->meshes_count; i++)
         {
+            cgltf_node * node = FindNode(data, &data->meshes[i]);
             for (unsigned int p = 0; p < data->meshes[i].primitives_count; p++)
             {
                 for (unsigned int j = 0; j < data->meshes[i].primitives[p].attributes_count; j++)
@@ -3783,6 +3820,19 @@ static Model LoadGLTF(const char *fileName)
                         model.meshes[primitiveIndex].vertices = RL_MALLOC(model.meshes[primitiveIndex].vertexCount*3*sizeof(float));
 
                         LOAD_ACCESSOR(float, 3, acc, model.meshes[primitiveIndex].vertices)
+                        if(node && node->has_matrix)
+                        {
+                            Matrix transform = MatrixFromGLTF(node->matrix);
+                            for(unsigned int k = 0; k < model.meshes[primitiveIndex].vertexCount; ++k)
+                            {
+                                float * vertices = model.meshes[primitiveIndex].vertices;
+                                Vector3 p = {vertices[3*k], vertices[3*k+1], vertices[3*k+2]};
+                                p = Vector3Transform(p, transform);
+                                vertices[3*k] = p.x;
+                                vertices[3*k+1] = p.y;
+                                vertices[3*k+2] = p.z;
+                            }
+                        }
                     }
                     else if (data->meshes[i].primitives[p].attributes[j].type == cgltf_attribute_type_normal)
                     {
